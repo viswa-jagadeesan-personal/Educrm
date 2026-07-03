@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { PlusCircleIcon, MailIcon, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +18,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -53,6 +59,14 @@ const NavItemExpanded = ({
   isActive: (url: string, subItems?: NavMainItem["subItems"]) => boolean;
   isSubmenuOpen: (subItems?: NavMainItem["subItems"]) => boolean;
 }) => {
+  const { isMobile, setOpenMobile } = useSidebar();
+  const handleLinkClick = () => {
+    window.dispatchEvent(new Event("next-route-start"));
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
+
   return (
     <Collapsible
       key={item.title}
@@ -80,7 +94,11 @@ const NavItemExpanded = ({
               isActive={isActive(item.url)}
               tooltip={item.title}
             >
-              <Link href={item.url} target={item.newTab ? "_blank" : undefined}>
+              <Link
+                href={item.url}
+                target={item.newTab ? "_blank" : undefined}
+                onClick={handleLinkClick}
+              >
                 {item.icon && <item.icon />}
                 <span>{item.title}</span>
                 {item.comingSoon && <IsComingSoon />}
@@ -101,6 +119,7 @@ const NavItemExpanded = ({
                     <Link
                       href={subItem.url}
                       target={subItem.newTab ? "_blank" : undefined}
+                      onClick={handleLinkClick}
                     >
                       {subItem.icon && <subItem.icon />}
                       <span>{subItem.title}</span>
@@ -124,55 +143,66 @@ const NavItemCollapsed = ({
   item: NavMainItem;
   isActive: (url: string, subItems?: NavMainItem["subItems"]) => boolean;
 }) => {
+  const { isMobile, setOpenMobile } = useSidebar();
+  const handleLinkClick = () => {
+    window.dispatchEvent(new Event("next-route-start"));
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
+
   return (
-    <SidebarMenuItem key={item.title}>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <SidebarMenuButton
-            disabled={item.comingSoon}
-            tooltip={item.title}
-            isActive={isActive(item.url, item.subItems)}
-          >
-            {item.icon && <item.icon />}
-            <span>{item.title}</span>
-          </SidebarMenuButton>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          className="w-50 space-y-1"
-          side="right"
-          align="start"
-        >
-          {item.subItems?.map((subItem) => (
-            <DropdownMenuItem key={subItem.title} asChild>
-              <SidebarMenuSubButton
-                key={subItem.title}
-                asChild
-                className="focus-visible:ring-0"
-                aria-disabled={subItem.comingSoon}
-                isActive={isActive(subItem.url)}
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <SidebarMenuItem key={item.title}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <SidebarMenuButton
+                disabled={item.comingSoon}
+                isActive={isActive(item.url, item.subItems)}
               >
-                <Link
-                  href={subItem.url}
-                  target={subItem.newTab ? "_blank" : undefined}
-                >
-                  {subItem.icon && (
-                    <subItem.icon className="[&>svg]:text-sidebar-foreground" />
-                  )}
-                  <span>{subItem.title}</span>
-                  {subItem.comingSoon && <IsComingSoon />}
-                </Link>
-              </SidebarMenuSubButton>
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </SidebarMenuItem>
+                {item.icon && <item.icon />}
+                <span>{item.title}</span>
+              </SidebarMenuButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              className="w-50 space-y-1"
+              side="right"
+              align="start"
+            >
+              {item.subItems?.map((subItem) => (
+                <DropdownMenuItem key={subItem.title} asChild>
+                  <Link
+                    href={subItem.url}
+                    target={subItem.newTab ? "_blank" : undefined}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-sm px-2.5 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground",
+                      isActive(subItem.url) && "bg-accent text-accent-foreground font-medium"
+                    )}
+                    onClick={handleLinkClick}
+                  >
+                    {subItem.icon && (
+                      <subItem.icon className="h-4 w-4 shrink-0" />
+                    )}
+                    <span>{subItem.title}</span>
+                    {subItem.comingSoon && <IsComingSoon />}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarMenuItem>
+      </TooltipTrigger>
+      <TooltipContent side="right" align="center">
+        {item.title}
+      </TooltipContent>
+    </Tooltip>
   );
 };
 
 export function NavMain({ items }: NavMainProps) {
   const path = usePathname();
-  const { state, isMobile } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
 
   const isItemActive = (url: string, subItems?: NavMainItem["subItems"]) => {
     if (subItems?.length) {
@@ -185,13 +215,20 @@ export function NavMain({ items }: NavMainProps) {
     return subItems?.some((sub) => path.startsWith(sub.url)) ?? false;
   };
 
+  const handleLinkClick = () => {
+    window.dispatchEvent(new Event("next-route-start"));
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
+
   return (
     <>
       {items.map((group) => (
         <SidebarGroup key={group.id}>
           {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
           <SidebarGroupContent className="flex flex-col gap-2">
-            <SidebarMenu>
+            <SidebarMenu className="gap-[10px]">
               {group.items.map((item) => {
                 if (state === "collapsed" && !isMobile) {
                   // If no subItems, just render the button as a link
@@ -207,6 +244,7 @@ export function NavMain({ items }: NavMainProps) {
                           <Link
                             href={item.url}
                             target={item.newTab ? "_blank" : undefined}
+                            onClick={handleLinkClick}
                           >
                             {item.icon && <item.icon />}
                             <span>{item.title}</span>
