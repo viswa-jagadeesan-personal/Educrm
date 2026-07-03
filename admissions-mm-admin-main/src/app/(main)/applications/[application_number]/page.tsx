@@ -67,7 +67,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { useApplication, useUpdateApplication } from "@/hooks/use-applications";
+import { useApplication, useUpdateApplication, ApplicationDetail } from "@/hooks/use-applications";
 import { gdInterviews } from "@/data/mock-gd-interviews";
 import { toast } from "sonner";
 
@@ -94,9 +94,11 @@ export default function ApplicationDetailsPage() {
     | null
   >(null);
 
-  const handleSave = (updatedData: any) => {
+  const handleSave = (updatedData: ApplicationDetail) => {
+    if (!activeEditSection) return;
     updateMutation.mutate({
       applicationNo: applicationNumber,
+      section: activeEditSection,
       data: updatedData,
     });
     setActiveEditSection(null);
