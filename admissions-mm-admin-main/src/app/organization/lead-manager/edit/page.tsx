@@ -6,12 +6,15 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLead, useUpdateLead } from "@/hooks/use-leads";
 import { useTeam } from "@/hooks/use-team";
+import { useAuthStore } from "@/stores/auth-store";
+import { Role } from "@/types/auth";
+import { SYSTEM_FIELD_IDS } from "@/lib/default-form-fields";
 import { ChevronLeft, Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { INDIAN_STATES, STATE_CITIES_MAP } from "@/lib/locations";
+import { INDIAN_STATES } from "@/lib/locations";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -66,6 +69,8 @@ function EditLeadForm() {
   const updateLead = useUpdateLead();
   const { data: teamData } = useTeam(1, 100);
   const teamMembers = teamData?.data || [];
+  const currentUser = useAuthStore((s) => s.user);
+  const canEditAssignedTo = currentUser?.role !== Role.LEAD_MANAGER;
 
   const [form, setForm] = React.useState({
     name: "",
@@ -73,6 +78,7 @@ function EditLeadForm() {
     mobile: "",
     city: "",
     state: "",
+    country: "",
     source: "",
     medium: "",
     campaign: "",
@@ -90,6 +96,7 @@ function EditLeadForm() {
         mobile: lead.phone || "",
         city: lead.city || "",
         state: lead.state || "",
+        country: lead.country || "India",
         source: lead.source || "",
         medium: lead.utmMedium || "",
         campaign: lead.utmCampaign || "",
@@ -103,6 +110,27 @@ function EditLeadForm() {
 
   function set(key: keyof typeof form, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  const EXCLUDED_RAW_KEYS = new Set<string>([...SYSTEM_FIELD_IDS, "stage", "notes"]);
+  const extraFields = Object.entries(lead?.rawPayload || {}).filter(
+    ([key, value]) =>
+      !EXCLUDED_RAW_KEYS.has(key) &&
+      value !== undefined &&
+      value !== null &&
+      value !== "",
+  );
+
+  function formatFieldLabel(key: string) {
+    return key
+      .replace(/[_-]+/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  function formatFieldValue(value: any) {
+    if (Array.isArray(value)) return value.join(", ");
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -122,6 +150,7 @@ function EditLeadForm() {
         phone: form.mobile || undefined,
         city: form.city || undefined,
         state: form.state || undefined,
+        country: form.country || undefined,
         source: form.source || undefined,
         utmSource: form.source || undefined,
         utmMedium: form.medium || undefined,
@@ -240,6 +269,21 @@ function EditLeadForm() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
                   <div className="flex flex-col gap-2">
                     <Label
+                      htmlFor="country"
+                      className="text-[14px] font-semibold uppercase tracking-[0.6px] text-muted-foreground"
+                    >
+                      Country
+                    </Label>
+                    <Input
+                      id="country"
+                      placeholder="e.g., India"
+                      value={form.country}
+                      onChange={(e) => set("country", e.target.value)}
+                      className="border border-input h-[40px] rounded-[8px] text-[12px] placeholder:text-muted-foreground"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label
                       htmlFor="state"
                       className="text-[14px] font-semibold uppercase tracking-[0.6px] text-muted-foreground"
                     >
@@ -247,7 +291,7 @@ function EditLeadForm() {
                     </Label>
                     <Select
                       value={form.state}
-                      onValueChange={(val) => setForm({ ...form, state: val, city: "" })}
+                      onValueChange={(val) => setForm({ ...form, state: val })}
                     >
                       <SelectTrigger
                         id="state"
@@ -271,28 +315,21 @@ function EditLeadForm() {
                     >
                       City
                     </Label>
-                    <Select
+                    <Input
+                      id="city"
+                      placeholder="Enter city"
                       value={form.city}
-                      onValueChange={(val) => setForm({ ...form, city: val })}
-                      disabled={!form.state}
-                    >
-                      <SelectTrigger className="w-full h-10 border border-input rounded-[8px] text-[12px] text-foreground">
-                        <SelectValue placeholder="Select City" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {form.state && STATE_CITIES_MAP[form.state] ? (
-                          STATE_CITIES_MAP[form.state].map((c) => (
-                            <SelectItem key={c} value={c}>
-                              {c}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="none" disabled>
-                            Select a state first
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
+                      onChange={(e) => set("city", e.target.value)}
+                      className="border border-input h-[40px] rounded-[8px] text-[12px] placeholder:text-muted-foreground"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-[14px] font-semibold uppercase tracking-[0.6px] text-muted-foreground">
+                      Preferred Branch
+                    </Label>
+                    <div className="border border-input h-[40px] rounded-[8px] text-[12px] flex items-center px-3 bg-muted/30 text-foreground">
+                      {lead?.branch?.name || "Not specified"}
+                    </div>
                   </div>
                 </div>
               </section>
@@ -308,6 +345,14 @@ function EditLeadForm() {
                   </p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-[14px] font-semibold uppercase tracking-[0.6px] text-muted-foreground">
+                      Form Submitted
+                    </Label>
+                    <div className="border border-input h-[40px] rounded-[8px] text-[12px] flex items-center px-3 bg-muted/30 text-foreground">
+                      {lead?.form?.name || "Not specified"}
+                    </div>
+                  </div>
                   <div className="flex flex-col gap-2">
                     <Label
                       htmlFor="source"
@@ -389,24 +434,34 @@ function EditLeadForm() {
                 </div>
               </section>
 
-              {/* Notes */}
+              {/* Additional Form Fields */}
               <section className="flex flex-col gap-5 pt-6">
                 <div className="flex flex-col gap-1">
                   <p className="text-[16px] font-medium text-foreground">
-                    Notes
+                    Additional Form Fields
                   </p>
                   <p className="text-[14px] text-muted-foreground">
-                    Any additional remarks about this lead.
+                    Extra fields captured from the submitted form, beyond the standard fields above.
                   </p>
                 </div>
-                <div>
-                  <Textarea
-                    placeholder="Add notes about this lead...."
-                    className="border border-input min-h-[137px] rounded-[8px] text-[12px] placeholder:text-muted-foreground resize-none"
-                    value={form.notes}
-                    onChange={(e) => set("notes", e.target.value)}
-                  />
-                </div>
+                {extraFields.length === 0 ? (
+                  <p className="text-[12px] text-muted-foreground italic">
+                    No additional fields were submitted.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                    {extraFields.map(([key, value]) => (
+                      <div key={key} className="flex flex-col gap-2">
+                        <Label className="text-[14px] font-semibold uppercase tracking-[0.6px] text-muted-foreground">
+                          {formatFieldLabel(key)}
+                        </Label>
+                        <div className="border border-input min-h-[40px] rounded-[8px] text-[12px] flex items-center px-3 bg-muted/30 text-foreground break-all">
+                          {formatFieldValue(value)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </section>
             </CardContent>
           </Card>
@@ -487,6 +542,7 @@ function EditLeadForm() {
                   <Select
                     value={form.assignedTo || "unassigned"}
                     onValueChange={(v) => set("assignedTo", v === "unassigned" ? "" : v)}
+                    disabled={!canEditAssignedTo}
                   >
                     <SelectTrigger
                       id="crm-assigned"
@@ -524,6 +580,24 @@ function EditLeadForm() {
                   </Button>
                 </Link>
               </div>
+            </div>
+
+            {/* Follow up Note Card */}
+            <div className="border border-border rounded-[8px] bg-card p-6 flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-[18px] font-medium text-foreground">
+                  Follow up Note
+                </h2>
+                <p className="text-[14px] text-muted-foreground">
+                  Any additional remarks about this lead.
+                </p>
+              </div>
+              <Textarea
+                placeholder="Add a follow up note about this lead...."
+                className="border border-input min-h-[137px] rounded-[8px] text-[12px] placeholder:text-muted-foreground resize-none"
+                value={form.notes}
+                onChange={(e) => set("notes", e.target.value)}
+              />
             </div>
 
             {/* Protip Card */}
